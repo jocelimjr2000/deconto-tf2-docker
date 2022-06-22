@@ -1,0 +1,81 @@
+version: "3"
+
+services:
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    networks:
+      - my_network
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    networks:
+      - my_network
+    depends_on:
+      - zookeeper
+    ports:
+      - 9092:9092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  kafdrop:
+    image: obsidiandynamics/kafdrop:latest
+    networks:
+      - my_network
+    depends_on:
+      - kafka
+    ports:
+      - 19000:9000
+    environment:
+      KAFKA_BROKERCONNECT: kafka:29092
+
+  mariadb:
+    image: jocelimjr/mariadb:1.0
+    container_name: ${COMPOSE_PROJECT_NAME}-database
+    restart: always
+    volumes:
+      - database_volume:/var/lib/mysql
+    networks:
+      - my_network
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ${COMPOSE_PROJECT_NAME}_rabbitmq
+    restart: always
+    networks:
+        - my_network
+    ports:
+        - "5672:5672"
+        - "15672:15672"
+        - "25676:25676"
+    volumes:
+        - rabbitmq_volume:/var/lib/rabbitmq
+    environment:
+        - "RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME}"
+        - "RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}"
+
+networks:
+  my_network:
+    driver: bridge
+    external: true
+    name: ${DEFAULT_NETWORK_NAME}
+
+volumes:
+    rabbitmq_volume:
+      external: false
+      name: ${COMPOSE_PROJECT_NAME}_rabbitmq_volume
+    database_volume:
+      name: ${COMPOSE_PROJECT_NAME}_database_volume
+      external: false
